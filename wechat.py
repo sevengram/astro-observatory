@@ -197,3 +197,6 @@ class MsgHandler(BaseHandler):
             'content': u'系统维护中'
         }
         self.send_response(post_resp_data)
+
+    def get_check_key(self, refer_dict):
+        return 'cee02b3226ac33fc254071832d099102'

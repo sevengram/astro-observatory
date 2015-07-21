@@ -15,7 +15,7 @@ from wechat import MsgHandler
 
 application = tornado.web.Application(
     handlers=[
-        (r'/notify/messages', MsgHandler)
+        (r'/notify/messages', MsgHandler, dict(sign_check=True))
     ], debug=True
 )
 
