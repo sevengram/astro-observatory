@@ -186,12 +186,12 @@ class MsgHandler(BaseHandler):
                    ('label', ''),
                    ('event_type', '')]
         )
-        for p in type_dict[msg_data['msg_type']]:
-            if p in process_dict:
-                res = yield process_dict.get(p)(msg_data)
-                if res:
-                    processed = (p != 'default')
-                    break
+        # for p in type_dict[msg_data['msg_type']]:
+        #     if p in process_dict:
+        #         res = yield process_dict.get(p)(msg_data)
+        #         if res:
+        #             processed = (p != 'default')
+        #             break
         post_resp_data = {
             'msg_type': 'text',
             'content': u'系统维护中'
