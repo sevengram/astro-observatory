@@ -175,6 +175,13 @@ process_dict = {
 
 class MsgHandler(BaseHandler):
     @tornado.gen.coroutine
+    def prepare(self):
+        if self.sign_check:
+            self.check_signature({k: v[0] for k, v in self.request.arguments.iteritems() if v},
+                                 sign_key='cee02b3226ac33fc254071832d099102',
+                                 method='md5')
+
+    @tornado.gen.coroutine
     def post(self):
         msg_data = self.assign_arguments(
             essential=['appid', 'openid', 'msg_type', 'msg_time', 'msg_id'],
@@ -197,6 +204,3 @@ class MsgHandler(BaseHandler):
             'content': u'系统维护中'
         }
         self.send_response(post_resp_data)
-
-    def get_check_key(self, refer_dict):
-        return 'cee02b3226ac33fc254071832d099102'
