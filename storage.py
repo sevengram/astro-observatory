@@ -19,6 +19,13 @@ class AstroSqldb(sqldb.Sqldb):
     def get_location(self, query):
         return self.get('location', {'query': query})
 
+    def get_last_query(self, openid):
+        return self.get('users', {'openid': openid})
+
+    def add_user_record(self, record):
+        self.replace('users', record)
+
+
 __db_parser = ConfigParser.ConfigParser()
 __db_parser.read(options.conf + '/db.conf')
 
@@ -58,5 +65,6 @@ class MongoConnector(object):
             res = yield motor.Op(self.datadb.deepsky.find_one, {
                 '$or': [{'object': query}, {'alias': query}, {'cn_name': query}, {'cn_alias': query}]})
         raise tornado.gen.Return(res)
+
 
 mongo_conn = MongoConnector(debug=False)

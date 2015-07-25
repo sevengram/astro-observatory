@@ -42,17 +42,12 @@ def process_command(req):
     else:
         cmd = req.get('content')
     if cmd and len(cmd) == 1 and '0' <= cmd <= '9':
-        # history = mysql_conn.get_lastquery(request['FromUserName'])
-        # if history and not history['last_status'] and history['last_query']:
-        #     if cmd == '1':
-        #         res = yield process_weather({
-        #             'Content': history['last_query'],
-        #             'MsgType': 'text',
-        #             'FromUserName': request['FromUserName']
-        #         })
-        #     if not res:
-        #         mysql_conn.add_feedback(
-        #             {'uid': request['FromUserName'], 'query': history['last_query'], 'type': cmd})
+        history = astro_storage.get_last_query(req['openid'])
+        if history and not history['last_status'] and history['last_query'] and cmd == '1':
+            req['content'] = history['last_query']
+            req['msg_type'] = 'text'
+            req['is_location'] = 1
+            resp = yield process_weather2(req)
         if not resp:
             resp = {
                 'msg_type': 'text',
@@ -209,14 +204,17 @@ def process_weather2(request):
     if len(query) < 2:
         raise tornado.gen.Return(None)
     resp = None
+    is_location = request.get('is_location') == 1
     location = astro_storage.get_location(query)
-    if not location:
+    if not location and not is_location:
         for word in consts.loc_keys:
             if word in query:
-                location = yield get_location(query)
-                if location:
-                    astro_storage.add_location(location)
+                is_location = True
                 break
+    if not location and is_location:
+        location = yield get_location(query)
+        if location:
+            astro_storage.add_location(location)
     if location:
         img_url = consts.seventimer_url + '?' + urllib.urlencode(
             {'lon': location['longitude'], 'lat': location['latitude'], 'lang': 'zh-CN',
@@ -226,7 +224,7 @@ def process_weather2(request):
             'tag': 'weather',
             'articles': [
                 {
-                    'title': request.get('label', ''),
+                    'title': location.get('address', ''),
                     'description': u'数据来自晴天钟(7timer.com)',
                     'picurl': img_url,
                     'url': img_url
@@ -270,6 +268,7 @@ class MsgHandler(BaseHandler):
                    ('event_type', '')]
         )
         resp = None
+        processed = False
         for p in type_dict[msg_data['msg_type']]:
             if p in process_dict:
                 resp = yield process_dict.get(p)(msg_data)
@@ -281,3 +280,5 @@ class MsgHandler(BaseHandler):
             self.send_response(post_resp_data)
         else:
             self.send_response(err_code=1)
+        astro_storage.add_user_record(
+            {'openid': msg_data['openid'], 'last_query': msg_data.get('content'), 'last_status': 1 if processed else 0})
