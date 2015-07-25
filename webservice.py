@@ -8,6 +8,8 @@ import tornado.options
 from tornado.options import define, options
 
 define('port', default=20100, help="run on the given port", type=int)
+define('env', default='dev', help="run on the given environment", type=str)
+define('conf', default='config', help="config file dir", type=str)
 
 tornado.options.parse_command_line()
 

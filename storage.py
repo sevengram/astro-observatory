@@ -1,12 +1,33 @@
 # -*- coding:utf8 -*-
 
+import ConfigParser
+
 import motor
 import tornado.gen
+from tornado.options import options
+
+from util import sqldb
 
 
-class Connector(object):
+class AstroSqldb(sqldb.Sqldb):
+    def __init__(self, db_name, db_host, db_user, db_pwd):
+        super(AstroSqldb, self).__init__(db_name, db_host, db_user, db_pwd)
+
+    def add_location(self, location):
+        self.replace('location', location)
+
+    def get_location(self, query):
+        return self.get('location', {'query': query})
+
+__db_parser = ConfigParser.ConfigParser()
+__db_parser.read(options.conf + '/db.conf')
+
+astro_storage = AstroSqldb(**dict(__db_parser.items(options.env)))
+
+
+class MongoConnector(object):
     def __init__(self, debug=False):
-        self.client = motor.MotorClient("mongodb://dsa:dsaeboue@localhost:27017/astro_data")
+        self.client = motor.MotorClient("mongodb://localhost:27017/astro_data")
         self.datadb = self.client.astro_data
         self.debug = debug
 
@@ -37,3 +58,5 @@ class Connector(object):
             res = yield motor.Op(self.datadb.deepsky.find_one, {
                 '$or': [{'object': query}, {'alias': query}, {'cn_name': query}, {'cn_alias': query}]})
         raise tornado.gen.Return(res)
+
+mongo_conn = MongoConnector(debug=False)

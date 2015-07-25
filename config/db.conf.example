@@ -1,0 +1,20 @@
+[dev]
+
+db_name = nearby_observatory
+db_host = 127.0.0.1
+db_user = root
+db_pwd = root
+
+[qa]
+
+db_name = nearby_observatory
+db_host = eridanus.mysql.rds.aliyuncs.com
+db_user = astro
+db_pwd = astroeboue
+
+[prod]
+
+db_name = nearby_observatory
+db_host = eridanus.mysql.rds.aliyuncs.com
+db_user = wechat_admin
+db_pwd = Waeboue123

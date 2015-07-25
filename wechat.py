@@ -1,43 +1,47 @@
 # -*- coding: utf-8 -*-
 
 import re
+import urllib
+import time
+import json
+import logging
 from collections import defaultdict
 
 import tornado.gen
+import tornado.httpclient
+import tornado.curl_httpclient
 
 from util.web import BaseHandler
+from storage import mongo_conn, astro_storage
 import consts
-import motordb
 import astro
-
-mongo_conn = motordb.Connector(debug=False)
 
 type_dict = defaultdict(lambda: ['default'], {
     'image': ['astrometry'],
     'location': ['weather1'],
-    'text': ['command', 'constellation', 'deepsky', 'solar', 'weather1', 'weather2', 'default'],
+    'text': ['command', 'constellation', 'deepsky', 'solar', 'weather2', 'default'],
     'event': ['welcome']
 })
 
 
 @tornado.gen.coroutine
 def process_welcome(req):
-    res = {
+    resp = {
         'msg_type': 'text',
         'content': consts.welcome_direction,
         'tag': 'welcome'
     }
-    raise tornado.gen.Return(res)
+    raise tornado.gen.Return(resp)
 
 
 @tornado.gen.coroutine
 def process_command(req):
+    resp = None
     if req.get('content') in consts.text_commands:
         cmd = consts.text_commands[req['content']]
     else:
         cmd = req.get('content')
     if cmd and len(cmd) == 1 and '0' <= cmd <= '9':
-        res = None
         # history = mysql_conn.get_lastquery(request['FromUserName'])
         # if history and not history['last_status'] and history['last_query']:
         #     if cmd == '1':
@@ -49,17 +53,13 @@ def process_command(req):
         #     if not res:
         #         mysql_conn.add_feedback(
         #             {'uid': request['FromUserName'], 'query': history['last_query'], 'type': cmd})
-        if res:
-            raise tornado.gen.Return(res)
-        else:
-            res = {
+        if not resp:
+            resp = {
                 'msg_type': 'text',
                 'content': consts.command_dicts[cmd],
                 'tag': 'command'
             }
-            raise tornado.gen.Return(res)
-    else:
-        raise tornado.gen.Return(None)
+    raise tornado.gen.Return(resp)
 
 
 @tornado.gen.coroutine
@@ -68,20 +68,22 @@ def process_default(req):
         msg = consts.default_format % req['content']
     else:
         msg = consts.default_response
-    res = {
+    resp = {
         'msg_type': 'text',
         'content': msg,
         'tag': 'default'
     }
-    raise tornado.gen.Return(res)
+    raise tornado.gen.Return(resp)
 
 
+@tornado.gen.coroutine
 def process_constellation(req):
     query = req.get('content')
     result = yield mongo_conn.find_constellation(query)
+    resp = None
     if result:
         article = result.get('article', '')[:100] + u'...(来自维基百科)'
-        res = {
+        resp = {
             'msg_type': 'news',
             'tag': 'constellation',
             'articles': [
@@ -93,19 +95,18 @@ def process_constellation(req):
                 }
             ]
         }
-        raise tornado.gen.Return(res)
-    else:
-        raise tornado.gen.Return(None)
+    raise tornado.gen.Return(resp)
 
 
 @tornado.gen.coroutine
 def process_solar(req):
     query = req.get('content')
     result = yield mongo_conn.find_solar(query)
+    resp = None
     if result:
         target_url = result.get('cn_wiki', '') if u'\u4e00' <= query[0] <= u'\u9fa5' else result.get('en_wiki', '')
         article = result.get('article', '')[:100] + u'...(来自维基百科)'
-        res = {
+        resp = {
             'msg_type': 'news',
             'tag': 'constellation',
             'articles': [
@@ -117,19 +118,18 @@ def process_solar(req):
                 }
             ]
         }
-        raise tornado.gen.Return(res)
-    else:
-        raise tornado.gen.Return(None)
+    raise tornado.gen.Return(resp)
 
 
 @tornado.gen.coroutine
 def process_deepsky(req):
-    query = req.get('content')
+    query = req.get('content', '')
     match = re.search('\d', query)
     usetitle = match and query[:match.start()].strip().lower() in [
         'messier', 'caldwell', 'abell', 'stock', 'berk', 'arp', 'cr', 'tr', 'sh']
     query = query.title() if usetitle else query.upper()
     querys = [query, query.replace(' ', '')] if ' ' in query else [query]
+    resp = None
     for q in querys:
         result = yield mongo_conn.find_deepsky(q)
         if result:
@@ -144,7 +144,7 @@ def process_deepsky(req):
                     target_url = 'http://en.m.wikipedia.org/wiki/%s' % '_'.join([objname[:i], objname[i:]])
             else:
                 target_url = ''
-            res = {
+            resp = {
                 'msg_type': 'news',
                 'tag': 'constellation',
                 'articles': [
@@ -156,15 +156,91 @@ def process_deepsky(req):
                     }
                 ]
             }
-            raise tornado.gen.Return(res)
-    raise tornado.gen.Return(None)
+            break
+    raise tornado.gen.Return(resp)
+
+
+@tornado.gen.coroutine
+def get_location(query):
+    query = query.encode('utf-8')
+    client = tornado.curl_httpclient.CurlAsyncHTTPClient()
+    map_url = "http://maps.googleapis.com/maps/api/geocode/json?" + urllib.urlencode(
+        {'address': query, 'sensor': 'false', 'language': 'zh-CN'})
+    locreq = tornado.httpclient.HTTPRequest(
+        url=map_url, connect_timeout=20, proxy_host='192.110.165.49', proxy_port=8180, request_timeout=20)
+    locres = yield client.fetch(locreq)
+    resp = None
+    if locres.code == 200:
+        try:
+            report = json.loads(locres.body)
+            if report['status'] == 'OK':
+                result = report['results'][0]
+                label = result['formatted_address']
+                lng = result['geometry']['location']['lng']
+                lat = result['geometry']['location']['lat']
+                resp = {'query': query, 'address': label, 'longitude': lng, 'latitude': lat}
+        except KeyError:
+            logging.warning('invalid resp from google geo api')
+    raise tornado.gen.Return(resp)
+
+
+@tornado.gen.coroutine
+def process_weather1(request):
+    img_url = consts.seventimer_url + '?' + urllib.urlencode(
+        {'lon': request['longitude'], 'lat': request['latitude'], 'lang': 'zh-CN', 'time': int(time.time())})
+    resp = {
+        'msg_type': 'news',
+        'tag': 'weather',
+        'articles': [
+            {
+                'title': request.get('label', ''),
+                'description': u'数据来自晴天钟(7timer.com)',
+                'picurl': img_url,
+                'url': img_url
+            }
+        ]
+    }
+    raise tornado.gen.Return(resp)
+
+
+@tornado.gen.coroutine
+def process_weather2(request):
+    query = request.get('content', '')
+    if len(query) < 2:
+        raise tornado.gen.Return(None)
+    resp = None
+    location = astro_storage.get_location(query)
+    if not location:
+        for word in consts.loc_keys:
+            if word in query:
+                location = yield get_location(query)
+                if location:
+                    astro_storage.add_location(location)
+                break
+    if location:
+        img_url = consts.seventimer_url + '?' + urllib.urlencode(
+            {'lon': location['longitude'], 'lat': location['latitude'], 'lang': 'zh-CN',
+             'time': int(time.time())})
+        resp = {
+            'msg_type': 'news',
+            'tag': 'weather',
+            'articles': [
+                {
+                    'title': request.get('label', ''),
+                    'description': u'数据来自晴天钟(7timer.com)',
+                    'picurl': img_url,
+                    'url': img_url
+                }
+            ]
+        }
+    raise tornado.gen.Return(resp)
 
 
 process_dict = {
     'constellation': process_constellation,
     'command': process_command,
-    # 'weather1': process_weather1,
-    # 'weather2': process_weather2,
+    'weather1': process_weather1,
+    'weather2': process_weather2,
     'deepsky': process_deepsky,
     'solar': process_solar,
     'default': process_default,
@@ -193,14 +269,15 @@ class MsgHandler(BaseHandler):
                    ('label', ''),
                    ('event_type', '')]
         )
-        # for p in type_dict[msg_data['msg_type']]:
-        #     if p in process_dict:
-        #         res = yield process_dict.get(p)(msg_data)
-        #         if res:
-        #             processed = (p != 'default')
-        #             break
-        post_resp_data = {
-            'msg_type': 'text',
-            'content': u'系统维护中'
-        }
-        self.send_response(post_resp_data)
+        resp = None
+        for p in type_dict[msg_data['msg_type']]:
+            if p in process_dict:
+                resp = yield process_dict.get(p)(msg_data)
+                if resp:
+                    processed = (p != 'default')
+                    break
+        if resp:
+            post_resp_data = resp
+            self.send_response(post_resp_data)
+        else:
+            self.send_response(err_code=1)
