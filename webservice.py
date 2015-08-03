@@ -13,11 +13,14 @@ define('conf', default='config', help="config file dir", type=str)
 
 tornado.options.parse_command_line()
 
-from wechat import MsgHandler
+from wechat import MsgHandler, ImageHandler
+from astrometry import AstrometryHandler
 
 application = tornado.web.Application(
     handlers=[
-        (r'/notify/messages', MsgHandler, dict(sign_check=True))
+        (r'/notify/messages', MsgHandler),
+        (r'/notify/image', ImageHandler),
+        (r'/astrometry', AstrometryHandler)
     ], debug=True
 )
 

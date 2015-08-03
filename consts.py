@@ -4,6 +4,14 @@ from collections import defaultdict
 
 seventimer_url = 'http://202.127.24.18/v4/bin/astro.php'
 
+astrometry_url = 'http://astro.deepsky.cc/astrometry'
+
+image_notify_url = 'http://astro.deepsky.cc/notify/image'
+
+astrometry_net_api_url = 'http://nova.astrometry.net/api/'
+
+astrometry_net_api_key = 'trcigafdpesfzgpe'
+
 welcome_direction = u'''欢迎来到邻家天文馆! 在这里, 你可以/:?
 1. 从晴天钟获取天气预报(输入地名或上传位置)
 2. 查询全天88星座(如:白羊座)
@@ -14,14 +22,14 @@ welcome_direction = u'''欢迎来到邻家天文馆! 在这里, 你可以/:?
 default_format = u'''"%s"是神马?可以吃吗?/:,@@其实你想查......
 1.天气
 2.星座
-3.深空天体
-0.萌妹纸'''
+3.深空天体'''
 
 default_response = u'''找不到相应的服务/:,@@其实你想查......
 1.天气
 2.星座
-3.深空天体
-0.萌妹纸'''
+3.深空天体'''
+
+image_response = u'正在召唤外星人分析你的图片, 请稍候\ue10c'
 
 text_commands = {
     u'天气': '1',
@@ -45,12 +53,11 @@ text_commands = {
 
 command_dicts = defaultdict(lambda: u'找不到这个指令哦', {
     '1': u'怎么查晴天钟呢? 随便挑一种办法吧!\n'
-    u'1.点击文本输入栏旁边的加号, 选择位置并发送\n'
-    u'2.直接发送地名(加上"省市区县"这样的字能提高识别率哦)',
+         u'1.点击文本输入栏旁边的加号, 选择位置并发送\n'
+         u'2.直接发送地名(加上"省市区县"这样的字能提高识别率哦)',
     '2': u'直接输入星座名称就可以啦, 比如"白羊座", "巨蟹"',
     '3': u'想在30000+深空天体中漫游么? 你可以输入编号查询, 如:M42, C4, NGC7000; 也可使用名称, 如"仙女座大星系", "加州星云"',
     '4': u'星空解析功能已经火热上线! 直接上传照片获取星空坐标和天体信息! 图像分析来自astrometry.net',
-    '0': u'呵呵',
     '9': welcome_direction
 })
 

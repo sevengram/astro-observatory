@@ -234,6 +234,33 @@ def process_weather2(request):
     raise tornado.gen.Return(resp)
 
 
+astrometry_tasks = []
+
+
+@tornado.gen.coroutine
+def process_astrometry(request):
+    if request['msg_id'] in astrometry_tasks:
+        raise tornado.gen.Return(None)
+    client = tornado.httpclient.AsyncHTTPClient()
+    body = urllib.urlencode({'pic_url': request.get('pic_url', ''),
+                             'notify_url': consts.image_notify_url,
+                             'openid': request.get('openid')})
+    req = tornado.httpclient.HTTPRequest(
+        url=consts.astrometry_url, method='POST', headers={}, body=body, connect_timeout=20, request_timeout=20)
+    response = yield client.fetch(req)
+    if response.code == 200:
+        astrometry_tasks.append(request['msg_id'])
+        if len(astrometry_tasks) > 100:
+            astrometry_tasks.pop(0)
+        raise tornado.gen.Return({
+            'msg_type': 'text',
+            'content': consts.image_response,
+            'tag': 'astrometry'
+        })
+    else:
+        raise tornado.gen.Return(None)
+
+
 process_dict = {
     'constellation': process_constellation,
     'command': process_command,
@@ -243,7 +270,7 @@ process_dict = {
     'solar': process_solar,
     'default': process_default,
     'welcome': process_welcome,
-    # 'astrometry': process_astrometry
+    'astrometry': process_astrometry
 }
 
 
@@ -282,3 +309,9 @@ class MsgHandler(BaseHandler):
             self.send_response(err_code=1)
         astro_storage.add_user_record(
             {'openid': msg_data['openid'], 'last_query': msg_data.get('content'), 'last_status': 1 if processed else 0})
+
+
+class ImageHandler(BaseHandler):
+    @tornado.gen.coroutine
+    def post(self):
+        pass  # TODO: add image notify
