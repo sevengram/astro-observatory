@@ -1,9 +1,8 @@
 # -*- coding:utf8 -*-
 
-import sys
 import json
 import time
-import urllib
+import logging
 
 import tornado.gen
 import tornado.httpclient
@@ -12,6 +11,7 @@ import tornado.web
 import tornado.ioloop
 
 import consts
+from util import security, http
 from util.web import BaseHandler
 
 reply_format = u'''赤经 %s
@@ -59,27 +59,33 @@ class AstrometryHandler(BaseHandler):
         self.session = None
 
     @tornado.gen.coroutine
-    def notify(self, url, status, message, userinfo):
-        body = urllib.urlencode(
-            {'status': status, 'message': message.encode('utf-8'), 'userinfo': userinfo})
-        client = tornado.httpclient.AsyncHTTPClient()
-        request = tornado.httpclient.HTTPRequest(
-            url=url, method='POST', headers={}, body=body, connect_timeout=30, request_timeout=120)
-        response = yield client.fetch(request)
-        print 'notify result:' + response.body
-        sys.stdout.flush()
+    def notify(self, status, message, openid):
+        # TODO: notify wechat api
+        req_data = {'appid': consts.appid,
+                    'openid': openid,
+                    'msg_type': 'text'}
+        if status == 0:
+            req_data['content'] = message
+        elif status == 1:
+            req_data['content'] = consts.image_data_err_msg
+        elif status == 2:
+            req_data['content'] = consts.image_resolution_err_msg
+        else:
+            req_data['content'] = consts.image_fail_err_msg
+        security.add_sign(req_data, consts.sitekey)
+        response = yield http.post_dict(url=consts.wechat_msgs_url, data=req_data)
+        logging.info('notify result: %s', response.body)
         raise tornado.gen.Return(response)
 
     @tornado.gen.coroutine
     def post(self):
         pic_url = self.get_argument('pic_url')
-        notify_url = self.get_argument('notify_url')
-        userinfo = self.get_argument('userinfo')
+        openid = self.get_argument('openid')
         self.send_response(err_code=0, err_msg='ok')
 
         subid = yield self.url_upload(pic_url)
         if not subid:
-            yield self.notify(notify_url, 1, 'submission error', userinfo)
+            yield self.notify(1, 'submission error', openid)
             return
 
         yield tornado.gen.Task(tornado.ioloop.IOLoop.instance().add_timeout, time.time() + 10)
@@ -100,7 +106,7 @@ class AstrometryHandler(BaseHandler):
             if count == 10:
                 i = 10
             elif count > 20:
-                yield self.notify(notify_url, 3, 'pic reduce error', userinfo)
+                yield self.notify(2, 'pic reduce error', openid)
                 return
             yield tornado.gen.Task(tornado.ioloop.IOLoop.instance().add_timeout, time.time() + i)
 
@@ -109,17 +115,17 @@ class AstrometryHandler(BaseHandler):
         while True:
             stat = yield self.job_status(jobid)
             if stat and stat.get('status') == 'success':
-                yield self.notify(notify_url, 0, build_reply(stat), userinfo)
+                yield self.notify(0, build_reply(stat), openid)
                 return
             elif stat and stat.get('status') == 'failure':
-                yield self.notify(notify_url, 2, 'fail to solve', userinfo)
+                yield self.notify(3, 'fail to solve', openid)
                 return
             else:
                 count += 1
                 if count == 10:
                     i = 15
                 elif count > 20:
-                    yield self.notify(notify_url, 2, 'fail to solve', userinfo)
+                    yield self.notify(3, 'fail to solve', openid)
                     return
                 yield tornado.gen.Task(tornado.ioloop.IOLoop.instance().add_timeout, time.time() + i)
 
@@ -132,19 +138,10 @@ class AstrometryHandler(BaseHandler):
             args.update({'session': self.session})
         json_data = json.dumps(args or {})
         url = consts.astrometry_net_api_url + service
-        print 'Sending to URL:', url
-        print 'Sending json:', json_data
-
-        headers = tornado.httputil.HTTPHeaders(
-            {"content-type": "application/x-www-form-urlencoded"})
-        body = urllib.urlencode({'request-json': json_data})
-
-        client = tornado.httpclient.AsyncHTTPClient()
-        request = tornado.httpclient.HTTPRequest(
-            url=url, method='POST', headers=headers, body=body, connect_timeout=30, request_timeout=120)
-        sys.stdout.flush()
+        logging.info('Sending to URL: %s', url)
+        logging.info('Sending json: %s', json_data)
         try:
-            response = yield client.fetch(request)
+            response = yield http.post_dict(url=url, data={'request-json': json_data})
         except tornado.web.HTTPError:
             response = yield self.send_request(service, args, retry + 1, retry_limit)
             raise tornado.gen.Return(response)
@@ -163,7 +160,7 @@ class AstrometryHandler(BaseHandler):
         if result.get('status') == 'success':
             raise tornado.gen.Return(result.get('session'))
         else:
-            print 'Bad apikey'
+            logging.error('Bad apikey')
             raise tornado.gen.Return(None)
 
     @tornado.gen.coroutine

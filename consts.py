@@ -2,11 +2,15 @@
 
 from collections import defaultdict
 
+appid = 'wxfc87c2547449c2c6'
+
+sitekey = 'cee02b3226ac33fc254071832d099102'
+
 seventimer_url = 'http://202.127.24.18/v4/bin/astro.php'
 
 astrometry_url = 'http://astro.deepsky.cc/astrometry'
 
-image_notify_url = 'http://astro.deepsky.cc/notify/image'
+wechat_msgs_url = 'http://wechat.deepsky.cc/sites/astro/msgs'
 
 astrometry_net_api_url = 'http://nova.astrometry.net/api/'
 
@@ -29,7 +33,13 @@ default_response = u'''找不到相应的服务/:,@@其实你想查......
 2.星座
 3.深空天体'''
 
-image_response = u'正在召唤外星人分析你的图片, 请稍候\ue10c'
+image_response = u'正在分析你的图片, 请稍候\ue10c'
+
+image_data_err_msg = u'数据传送失败, 请重试'
+
+image_resolution_err_msg = u'图像处理失败, 可能是分辨率太低了, 重新提交一次吧'
+
+image_fail_err_msg = u'无法分析这张照片, 换一张试试吧'
 
 text_commands = {
     u'天气': '1',

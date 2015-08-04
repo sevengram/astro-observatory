@@ -56,8 +56,6 @@ class MongoConnector(object):
 
     @tornado.gen.coroutine
     def find_deepsky(self, query):
-        # cursor = self.datadb.deepsky.find({'$or': [{'object': query}, {'alias': query}]}, limit=5)
-        # result = yield motor.Op(cursor.to_list)
         if query.startswith('Abell'):
             res = yield motor.Op(self.datadb.deepsky.find_one, {
                 '$or': [{'alias': query}, {'object': query}, {'cn_name': query}, {'cn_alias': query}]})

@@ -11,6 +11,7 @@ import tornado.gen
 import tornado.httpclient
 import tornado.curl_httpclient
 
+from util import http
 from util.web import BaseHandler
 from storage import mongo_conn, astro_storage
 import consts
@@ -158,12 +159,11 @@ def process_deepsky(req):
 @tornado.gen.coroutine
 def get_location(query):
     query = query.encode('utf-8')
-    client = tornado.curl_httpclient.CurlAsyncHTTPClient()
-    map_url = "http://maps.googleapis.com/maps/api/geocode/json?" + urllib.urlencode(
-        {'address': query, 'sensor': 'false', 'language': 'zh-CN'})
-    locreq = tornado.httpclient.HTTPRequest(
-        url=map_url, connect_timeout=20, proxy_host='192.110.165.49', proxy_port=8180, request_timeout=20)
-    locres = yield client.fetch(locreq)
+    locres = yield http.get_dict(
+        url="http://maps.googleapis.com/maps/api/geocode/json",
+        data={'address': query, 'sensor': 'false', 'language': 'zh-CN'},
+        proxy_host='192.110.165.49',
+        proxy_port=8180)
     resp = None
     if locres.code == 200:
         try:
@@ -241,13 +241,10 @@ astrometry_tasks = []
 def process_astrometry(request):
     if request['msg_id'] in astrometry_tasks:
         raise tornado.gen.Return(None)
-    client = tornado.httpclient.AsyncHTTPClient()
-    body = urllib.urlencode({'pic_url': request.get('pic_url', ''),
-                             'notify_url': consts.image_notify_url,
-                             'openid': request.get('openid')})
-    req = tornado.httpclient.HTTPRequest(
-        url=consts.astrometry_url, method='POST', headers={}, body=body, connect_timeout=20, request_timeout=20)
-    response = yield client.fetch(req)
+    response = yield http.post_dict(
+        url=consts.astrometry_url,
+        data={'pic_url': request.get('pic_url', ''),
+              'openid': request.get('openid')})
     if response.code == 200:
         astrometry_tasks.append(request['msg_id'])
         if len(astrometry_tasks) > 100:
@@ -279,8 +276,7 @@ class MsgHandler(BaseHandler):
     def prepare(self):
         if self.sign_check:
             self.check_signature({k: v[0] for k, v in self.request.arguments.iteritems() if v},
-                                 sign_key='cee02b3226ac33fc254071832d099102',
-                                 method='md5')
+                                 sign_key=consts.sitekey, method='md5')
 
     @tornado.gen.coroutine
     def post(self):
@@ -309,9 +305,3 @@ class MsgHandler(BaseHandler):
             self.send_response(err_code=1)
         astro_storage.add_user_record(
             {'openid': msg_data['openid'], 'last_query': msg_data.get('content'), 'last_status': 1 if processed else 0})
-
-
-class ImageHandler(BaseHandler):
-    @tornado.gen.coroutine
-    def post(self):
-        pass  # TODO: add image notify
