@@ -60,7 +60,6 @@ class AstrometryHandler(BaseHandler):
 
     @tornado.gen.coroutine
     def notify(self, status, message, openid):
-        # TODO: notify wechat api
         req_data = {'appid': consts.appid,
                     'openid': openid,
                     'msg_type': 'text'}
@@ -88,7 +87,7 @@ class AstrometryHandler(BaseHandler):
             yield self.notify(1, 'submission error', openid)
             return
 
-        yield tornado.gen.Task(tornado.ioloop.IOLoop.instance().add_timeout, time.time() + 10)
+        yield tornado.gen.Task(tornado.ioloop.IOLoop.instance().add_timeout, time.time() + 15)
         count, i = 0, 5
         jobid = None
         while True:
