@@ -173,7 +173,7 @@ def get_location(query):
                 label = result['formatted_address']
                 lng = result['geometry']['location']['lng']
                 lat = result['geometry']['location']['lat']
-                resp = {'query': query, 'address': label, 'longitude': lng, 'latitude': lat}
+                resp = {'query': query, 'label': label, 'longitude': lng, 'latitude': lat}
         except KeyError:
             logging.warning('invalid resp from google geo api')
     raise tornado.gen.Return(resp)
@@ -224,7 +224,7 @@ def process_weather2(request):
             'tag': 'weather',
             'articles': [
                 {
-                    'title': location.get('address', ''),
+                    'title': location.get('label', ''),
                     'description': u'数据来自晴天钟(7timer.com)',
                     'picurl': img_url,
                     'url': img_url
