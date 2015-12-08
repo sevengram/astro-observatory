@@ -170,10 +170,10 @@ def get_location(query):
             report = json.loads(locres.body)
             if report['status'] == 'OK':
                 result = report['results'][0]
-                label = result['formatted_address']
+                address = result['formatted_address']
                 lng = result['geometry']['location']['lng']
                 lat = result['geometry']['location']['lat']
-                resp = {'query': query, 'label': label, 'longitude': lng, 'latitude': lat}
+                resp = {'query': query, 'address': address, 'longitude': lng, 'latitude': lat}
         except KeyError:
             logging.warning('invalid resp from google geo api')
     raise tornado.gen.Return(resp)
@@ -224,7 +224,7 @@ def process_weather2(request):
             'tag': 'weather',
             'articles': [
                 {
-                    'title': location.get('label', ''),
+                    'title': location.get('address', ''),
                     'description': u'数据来自晴天钟(7timer.com)',
                     'picurl': img_url,
                     'url': img_url

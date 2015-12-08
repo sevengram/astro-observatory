@@ -16,5 +16,5 @@ db_pwd = astroeboue
 
 db_name = nearby_observatory
 db_host = eridanus.mysql.rds.aliyuncs.com
-db_user = wechat_admin
-db_pwd = Waeboue123
+db_user = astro
+db_pwd = astroeboue
