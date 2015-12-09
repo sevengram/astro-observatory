@@ -12,6 +12,16 @@ astrometry_url = 'http://astro.deepsky.cc/astrometry'
 
 wechat_msgs_url = 'http://wechat.deepsky.cc/sites/astro/msgs'
 
+wechat_multimsgs_url = 'http://wechat.deepsky.cc/sites/astro/multimsgs'
+
+wechat_news_url = 'http://wechat.deepsky.cc/sites/astro/news'
+
+apod_pic_base_url = 'http://www.phys.ncku.edu.tw/~astrolab/mirrors/apod/'
+
+apod_cn_base_url = 'http://www.phys.ncku.edu.tw/~astrolab/mirrors/apod/ap%s.html'
+
+apod_en_base_url = 'http://apod.nasa.gov/apod/ap%s.html'
+
 astrometry_net_api_url = 'http://nova.astrometry.net/api/'
 
 astrometry_net_api_key = 'trcigafdpesfzgpe'

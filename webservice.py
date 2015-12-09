@@ -1,5 +1,6 @@
 #! /usr/bin/env python2
 # -*- coding:utf8 -*-
+import logging
 
 import tornado.web
 import tornado.httpserver
@@ -22,6 +23,10 @@ application = tornado.web.Application(
         (r'/astrometry', AstrometryHandler)
     ], debug=True
 )
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 if __name__ == "__main__":
     http_server = tornado.httpserver.HTTPServer(application, xheaders=True)
