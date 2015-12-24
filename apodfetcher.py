@@ -54,7 +54,7 @@ def fetch_apod():
         return None
 
 
-def upload_material(data):
+def upload_news(data):
     data = {
         'appid': consts.appid,
         'title': (u'[每日天文一圖] ' + data['title']).encode('utf-8'),
@@ -80,16 +80,32 @@ def upload_material(data):
     resp = http.post_dict_sync(url=consts.wechat_news_url, data=data)
     if resp.code != 200:
         logging.error('fail to upload material')
-        return None
+        return False
     else:
         resp_data = json.loads(resp.body)
         if resp_data['err_code'] != 0:
             logging.error('fail to upload material: %s: %s', resp_data['err_code'], resp_data['err_msg'])
+            return False
+        else:
+            logging.info('finish to upload material')
+            return True
+
+
+def get_lastest_news():
+    data = {'appid': consts.appid}
+    security.add_sign(data, consts.sitekey)
+    resp = http.get_dict_sync(url=consts.wechat_news_url, data=data)
+    if resp.code != 200:
+        logging.error('fail to get lastest news')
+        return None
+    else:
+        resp_data = json.loads(resp.body)
+        if resp_data['err_code'] != 0:
+            logging.error('fail to get lastest news: %s: %s', resp_data['err_code'], resp_data['err_msg'])
             return None
         else:
-            appmsgid = resp_data['data']['appmsgid']
-            logging.info('finish to upload material: %s', appmsgid)
-            return appmsgid
+            logging.info('finish to get lastest news: %s', resp_data['data'])
+            return resp_data['data']
 
 
 def send_message(appmsgid):
@@ -101,25 +117,49 @@ def send_message(appmsgid):
     resp = http.post_dict_sync(url=consts.wechat_multimsgs_url, data=data)
     if resp.code != 200:
         logging.error('fail to send msg')
+        return False
     else:
         resp_data = json.loads(resp.body)
         if resp_data['err_code'] != 0:
             logging.error('fail to send msg: %s: %s', resp_data['err_code'], resp_data['err_msg'])
+            return False
         else:
             logging.info('finish to send msg')
+            return True
 
 
 if __name__ == "__main__":
-    count, limit = 0, 2
+    limit = 5
+
     result = None
-    while True:
+    for i in range(limit):
+        logging.info('fetch apod...%d', i)
         result = fetch_apod()
-        count += 1
-        if count > limit or result:
+        if result:
             break
         else:
             time.sleep(60)
-    if result:
-        msgid = upload_material(result)
-        if msgid:
-            send_message(msgid)
+    if not result:
+        exit(1)
+
+    msgid = None
+    for i in range(limit):
+        logging.info('upload news...%d', i)
+        result = upload_news(result)
+        if result:
+            time.sleep(300)
+            news = get_lastest_news()
+            if time.time() - int(news['create_time']) < 1800:
+                msgid = str(news['app_id'])
+                break
+        else:
+            time.sleep(60)
+
+    if not msgid:
+        exit(1)
+    for i in range(limit):
+        logging.info('send message...%d', i)
+        if send_message(msgid):
+            break
+        else:
+            time.sleep(60)
