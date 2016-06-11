@@ -1,6 +1,6 @@
-# -*- coding:utf8 -*-
+# -*- coding: utf-8 -*-
 
-import ConfigParser
+from configparser import ConfigParser
 
 import motor
 import tornado.gen
@@ -26,7 +26,7 @@ class AstroSqldb(sqldb.Sqldb):
         self.replace('users', record)
 
 
-__db_parser = ConfigParser.ConfigParser()
+__db_parser = ConfigParser()
 __db_parser.read(options.conf + '/db.conf')
 
 astro_storage = AstroSqldb(**dict(__db_parser.items(options.env)))

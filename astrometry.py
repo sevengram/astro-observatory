@@ -1,4 +1,4 @@
-# -*- coding:utf8 -*-
+# -*- coding: utf-8 -*-
 
 import json
 import time
@@ -11,10 +11,10 @@ import tornado.web
 import tornado.ioloop
 
 import consts
-from util import security, http
+from util import security, httputils
 from util.web import BaseHandler
 
-reply_format = u'''赤经 %s
+reply_format = '''赤经 %s
 赤纬 %s
 范围 %s
 主要天体 %s
@@ -34,7 +34,7 @@ def format_dec(dec):
     d = dec
     m = abs(d - int(d)) * 60.0
     s = abs(m - int(m)) * 60.0
-    return u'%+03d° %02d\' %06.3f"' % (int(d), int(m), s)
+    return '%+03d° %02d\' %06.3f"' % (int(d), int(m), s)
 
 
 def format_radius(radius):
@@ -72,7 +72,7 @@ class AstrometryHandler(BaseHandler):
         else:
             req_data['content'] = consts.image_fail_err_msg
         security.add_sign(req_data, consts.sitekey)
-        response = yield http.post_dict(url=consts.wechat_msgs_url, data=req_data)
+        response = yield httputils.post_dict(url=consts.wechat_msgs_url, data=req_data)
         logging.info('notify result: %s', response.body)
         raise tornado.gen.Return(response)
 
@@ -140,12 +140,12 @@ class AstrometryHandler(BaseHandler):
         logging.info('Sending to URL: %s', url)
         logging.info('Sending json: %s', json_data)
         try:
-            response = yield http.post_dict(url=url, data={'request-json': json_data})
+            response = yield httputils.post_dict(url=url, data={'request-json': json_data})
         except tornado.web.HTTPError:
             response = yield self.send_request(service, args, retry + 1, retry_limit)
             raise tornado.gen.Return(response)
         if response.code == 200:
-            raise tornado.gen.Return(json.loads(response.body))
+            raise tornado.gen.Return(json.loads(response.body.decode('utf8')))
         else:
             response = yield self.send_request(service, args, retry + 1, retry_limit)
             raise tornado.gen.Return(response)

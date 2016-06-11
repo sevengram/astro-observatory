@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 
-import re
-import urllib
-import time
 import json
 import logging
+import re
+import time
 from collections import defaultdict
 
+import tornado.curl_httpclient
 import tornado.gen
 import tornado.httpclient
-import tornado.curl_httpclient
 
-from util import http
-from util.web import BaseHandler
-from storage import mongo_conn, astro_storage
-import consts
 import astro
+import consts
+from storage import mongo_conn, astro_storage
+from util import httputils
+from util.httputils import build_url
+from util.web import BaseHandler
 
 type_dict = defaultdict(lambda: ['default'], {
     'image': ['astrometry'],
@@ -78,7 +78,7 @@ def process_constellation(req):
     result = yield mongo_conn.find_constellation(query)
     resp = None
     if result:
-        article = result.get('article', '')[:100] + u'...(来自维基百科)'
+        article = result.get('article', '')[:100] + '...(来自维基百科)'
         resp = {
             'msg_type': 'news',
             'tag': 'constellation',
@@ -100,8 +100,8 @@ def process_solar(req):
     result = yield mongo_conn.find_solar(query)
     resp = None
     if result:
-        target_url = result.get('cn_wiki', '') if u'\u4e00' <= query[0] <= u'\u9fa5' else result.get('en_wiki', '')
-        article = result.get('article', '')[:100] + u'...(来自维基百科)'
+        target_url = result.get('cn_wiki', '') if '\u4e00' <= query[0] <= '\u9fa5' else result.get('en_wiki', '')
+        article = result.get('article', '')[:100] + '...(来自维基百科)'
         resp = {
             'msg_type': 'news',
             'tag': 'constellation',
@@ -134,7 +134,7 @@ def process_deepsky(req):
             match = re.search('\d', objname)
             if match:
                 i = match.start()
-                if u'\u4e00' <= query[0] <= u'\u9fa5':
+                if '\u4e00' <= query[0] <= '\u9fa5':
                     target_url = 'http://zh.m.wikipedia.org/zh-cn/%s' % '_'.join([objname[:i], objname[i:]])
                 else:
                     target_url = 'http://en.m.wikipedia.org/wiki/%s' % '_'.join([objname[:i], objname[i:]])
@@ -158,8 +158,7 @@ def process_deepsky(req):
 
 @tornado.gen.coroutine
 def get_location(query):
-    query = query.encode('utf-8')
-    locres = yield http.get_dict(
+    locres = yield httputils.get_dict(
         url="http://maps.googleapis.com/maps/api/geocode/json",
         data={'address': query, 'sensor': 'false', 'language': 'zh-CN'},
         proxy_host='192.110.165.49',
@@ -167,7 +166,7 @@ def get_location(query):
     resp = None
     if locres.code == 200:
         try:
-            report = json.loads(locres.body)
+            report = json.loads(locres.body.decode('utf8'))
             if report['status'] == 'OK':
                 result = report['results'][0]
                 address = result['formatted_address']
@@ -181,15 +180,19 @@ def get_location(query):
 
 @tornado.gen.coroutine
 def process_weather1(request):
-    img_url = consts.seventimer_url + '?' + urllib.urlencode(
-        {'lon': request['longitude'], 'lat': request['latitude'], 'lang': 'zh-CN', 'time': int(time.time())})
+    img_url = build_url(consts.seventimer_url, {
+        'lon': request['longitude'],
+        'lat': request['latitude'],
+        'lang': 'zh-CN',
+        'time': int(time.time())
+    })
     resp = {
         'msg_type': 'news',
         'tag': 'weather',
         'articles': [
             {
                 'title': request.get('label', ''),
-                'description': u'数据来自晴天钟(7timer.com)',
+                'description': '数据来自晴天钟(7timer.com)',
                 'picurl': img_url,
                 'url': img_url
             }
@@ -216,16 +219,19 @@ def process_weather2(request):
         if location:
             astro_storage.add_location(location)
     if location:
-        img_url = consts.seventimer_url + '?' + urllib.urlencode(
-            {'lon': location['longitude'], 'lat': location['latitude'], 'lang': 'zh-CN',
-             'time': int(time.time())})
+        img_url = build_url(consts.seventimer_url, {
+            'lon': location['longitude'],
+            'lat': location['latitude'],
+            'lang': 'zh-CN',
+            'time': int(time.time())
+        })
         resp = {
             'msg_type': 'news',
             'tag': 'weather',
             'articles': [
                 {
                     'title': location.get('address', ''),
-                    'description': u'数据来自晴天钟(7timer.com)',
+                    'description': '数据来自晴天钟(7timer.com)',
                     'picurl': img_url,
                     'url': img_url
                 }
@@ -241,7 +247,7 @@ astrometry_tasks = []
 def process_astrometry(request):
     if request['msg_id'] in astrometry_tasks:
         raise tornado.gen.Return(None)
-    response = yield http.post_dict(
+    response = yield httputils.post_dict(
         url=consts.astrometry_url,
         data={'pic_url': request.get('pic_url', ''),
               'openid': request.get('openid')})
@@ -275,7 +281,7 @@ class MsgHandler(BaseHandler):
     @tornado.gen.coroutine
     def prepare(self):
         if self.sign_check:
-            self.check_signature({k: v[0] for k, v in self.request.arguments.iteritems() if v},
+            self.check_signature({k: v[0] for k, v in self.request.arguments.items() if v},
                                  sign_key=consts.sitekey, method='md5')
 
     @tornado.gen.coroutine
