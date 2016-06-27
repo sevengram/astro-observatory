@@ -6,15 +6,17 @@ appid = 'wxfc87c2547449c2c6'
 
 sitekey = 'cee02b3226ac33fc254071832d099102'
 
+wechat_base_url = 'http://wechat.deepsky.cc'
+
 seventimer_url = 'http://202.127.24.18/v4/bin/astro.php'
 
 astrometry_url = 'http://astro.deepsky.cc/astrometry'
 
-wechat_msgs_url = 'http://wechat.deepsky.cc/sites/astro/msgs'
+wechat_msgs_url = wechat_base_url + '/sites/astro/msgs'
 
-wechat_multimsgs_url = 'http://wechat.deepsky.cc/sites/astro/multimsgs'
+wechat_multimsgs_url = wechat_base_url + '/sites/astro/multimsgs'
 
-wechat_news_url = 'http://wechat.deepsky.cc/sites/astro/news'
+wechat_news_url = wechat_base_url + '/sites/astro/news'
 
 apod_pic_base_url = 'http://www.phys.ncku.edu.tw/~astrolab/mirrors/apod/'
 

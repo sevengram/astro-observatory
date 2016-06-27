@@ -1,14 +1,14 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import datetime
 import json
 import logging
-import datetime
 import re
 import time
 
-import tornado.web
 import tornado.httpclient
+import tornado.web
 from bs4 import BeautifulSoup
 
 import consts
@@ -33,7 +33,7 @@ def fetch_apod():
     en_url = consts.apod_en_base_url % date
     try:
         resp = httputils.get_dict_sync(url=cn_url)
-        data = BeautifulSoup(resp.body)
+        data = BeautifulSoup(resp.body, 'lxml')
         title = replace_blanks(data.find_all('center')[1].find('b').text)
         author = replace_blanks(data.find_all('center')[1].text).replace(title, '').strip()
         article = replace_blanks(
@@ -55,10 +55,10 @@ def fetch_apod():
 
 
 def upload_news(data):
-    data = {
+    req_data = {
         'appid': consts.appid,
-        'title': ('[每日天文一圖] ' + data['title']).encode('utf-8'),
-        'content': (
+        'title': '[每日天文一圖] ' + data['title'],
+        'content':
             '<p><strong>%s</strong></p>'
             '<p><strong>%s</strong></p>'
             '<p><br/></p>'
@@ -73,11 +73,11 @@ def upload_news(data):
             '<p style="color: rgb(106, 145, 194);"><strong>3.查询超过3万个深空天体</strong></p>'
             '<p style="color: rgb(124, 162, 210);"><strong>4.解析星空照片</strong></p>'
             '<p style="color: rgb(141, 179, 226);"><strong>如需详细帮助, 请回复对应数字.</strong></p>' % (
-                data['author'], data['translate'], data['article'], data['en_url'], data['cn_url'])).encode('utf-8'),
+                data['author'], data['translate'], data['article'], data['en_url'], data['cn_url']),
         'picurl': data['picurl'], 'source_url': data['cn_url'],
-        'digest': (data['article'][:100] + '...').encode('utf-8')}
-    security.add_sign(data, consts.sitekey)
-    resp = httputils.post_dict_sync(url=consts.wechat_news_url, data=data)
+        'digest': data['article'][:100] + '...'}
+    security.add_sign(req_data, consts.sitekey)
+    resp = httputils.post_dict_sync(url=consts.wechat_news_url, data=req_data)
     if resp.code != 200:
         logging.error('fail to upload material')
         return False
@@ -131,23 +131,25 @@ def send_message(appmsgid):
 if __name__ == "__main__":
     limit = 5
 
-    result = None
+    fetch_result = None
     for i in range(limit):
         logging.info('fetch apod...%d', i)
-        result = fetch_apod()
-        if result:
+        fetch_result = fetch_apod()
+        if fetch_result:
+            logging.info(fetch_result)
             break
         else:
             time.sleep(60)
-    if not result:
+    if not fetch_result:
         exit(1)
 
     msgid = None
     for i in range(limit):
         logging.info('upload news...%d', i)
-        result = upload_news(result)
-        if result:
-            time.sleep(300)
+        upload_result = upload_news(fetch_result)
+        if upload_result:
+            logging.info(upload_result)
+            time.sleep(60)
             news = get_lastest_news()
             if time.time() - int(news['create_time']) < 1800:
                 msgid = str(news['app_id'])
