@@ -148,8 +148,7 @@ if __name__ == "__main__":
         logging.info('upload news...%d', i)
         upload_result = upload_news(fetch_result)
         if upload_result:
-            logging.info(upload_result)
-            time.sleep(60)
+            time.sleep(300)
             news = get_lastest_news()
             if time.time() - int(news['create_time']) < 1800:
                 msgid = str(news['app_id'])
